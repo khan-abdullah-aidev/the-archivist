@@ -1,0 +1,11 @@
+.vercel
+.env
+.env.local
+node_modules
+
+# Design-brief scratch files — contain an old (revoked) API key, not part of the deployed app
+/The Archivist.html
+/The Archivist (standalone).html
+/.thumbnail
+/scraps/
+/uploads/

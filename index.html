@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>The Archivist</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "primary": "#C2A46B",
+          "bg-dark": "#181613",
+          "bg-deeper": "#110f0d",
+          "surface": "#211e1a",
+          "surface-raised": "#2a2621",
+          "text-primary": "#EBE4D6",
+          "text-body": "#CFC7B6",
+          "text-muted": "#8A8172",
+          "error": "#A24A38",
+          "highlight": "#5E7D82",
+        },
+        fontFamily: {
+          "display": ["Newsreader", "serif"],
+          "ui": ["DM Sans", "sans-serif"],
+        },
+        borderRadius: { "DEFAULT": "0px", "sm": "2px", "md": "4px", "lg": "6px", "full": "9999px" },
+      }
+    }
+  }
+</script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #181613;
+    color: #CFC7B6;
+    overscroll-behavior: none;
+    min-height: 100dvh;
+  }
+  .font-display { font-family: 'Newsreader', serif; }
+  .screen { display: none; flex-direction: column; height: 100dvh; overflow: hidden; }
+  .screen.active { display: flex; }
+  .icon { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 24px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; user-select: none; }
+  .lore-ref { border-bottom: 1px dashed #C2A46B; cursor: pointer; padding-bottom: 1px; }
+  .lore-violation { border-bottom: 1.5px wavy #A24A38; color: inherit; cursor: pointer; }
+  [contenteditable] { outline: none; }
+  [contenteditable]:empty:before { content: attr(data-placeholder); color: #8A8172; pointer-events: none; }
+  .drawer { transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+  .drawer.open { transform: translateX(0); }
+  .overlay { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+  .overlay.open { opacity: 1; pointer-events: all; }
+  .modal { transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+  .modal.open { transform: translateY(0); }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; transition: background-color 0.6s ease; }
+  .status-clean { background: #7E9670; }
+  .status-scanning { background: #8A8172; animation: pulse 2.2s ease-in-out infinite; }
+  .status-violation { background: #A24A38; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .shimmer { background: linear-gradient(90deg, #211e1a 25%, #2a2621 50%, #211e1a 75%); background-size: 200% 100%; animation: shimmer 1.8s ease-in-out infinite; }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .slide-in { animation: slideIn 0.35s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .tab-active { color: #EBE4D6; border-bottom: 1px solid #C2A46B; }
+  .tab-inactive { color: #8A8172; border-bottom: 1px solid transparent; }
+  .thread-line::before {
+    content: ''; position: absolute; left: 0; top: 16px; bottom: 0;
+    width: 1px; background: #8A817255; transform: translateX(-50%);
+  }
+  .violation-card { border-left: 2px solid #A24A38; }
+  ::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #8A817233; border-radius: 3px; }
+  .api-key-banner { background: linear-gradient(135deg, #1d1a15, #241f17); border: 1px solid #C2A46B44; }
+  select option { background: #211e1a; }
+  ::selection { background: #C2A46B33; }
+</style>
+</head>
+<body class="dark">
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: SETUP -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-setup" class="screen active">
+  <div class="flex flex-col items-center justify-center flex-1 px-8 py-12">
+    <div class="mb-10 text-center">
+      <div class="mb-6 flex justify-center"><span class="icon text-primary/70" style="font-size:46px; font-variation-settings:'wght' 200, 'FILL' 0">history_edu</span></div>
+      <h1 class="font-display text-4xl font-bold text-primary mb-3">The Archivist</h1>
+      <p class="text-text-muted text-sm leading-relaxed max-w-xs mx-auto">Your continuity-aware writing workspace. Track lore, threads, and canon — all in one place.</p>
+    </div>
+    <div class="w-full max-w-sm space-y-4">
+      <div>
+        <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">What's your story called?</label>
+        <input id="story-title-input" type="text" placeholder="e.g. Spill" autofocus
+          class="w-full bg-surface border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm font-ui placeholder:text-text-muted"
+          onkeydown="if(event.key==='Enter') handleSetup()"/>
+      </div>
+      <button onclick="handleSetup()" class="w-full bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider py-3 rounded-sm hover:bg-primary/90 transition-colors">
+        Begin the Chronicle
+      </button>
+      <p id="setup-error" class="text-error text-xs text-center hidden">Give your story a title first.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: IMPORT & ANALYZE -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-import" class="screen">
+  <header class="flex items-center justify-between px-5 py-4 border-b border-text-muted/20 bg-bg-dark shrink-0">
+    <button onclick="goTo('codex')" class="text-text-muted hover:text-text-primary transition-colors p-1">
+      <span class="icon">arrow_back</span>
+    </button>
+    <h1 class="font-display text-xl font-bold text-text-primary">Import Chapters</h1>
+    <div class="w-8"></div>
+  </header>
+
+  <!-- Step 1: Paste -->
+  <div id="import-step-paste" class="flex flex-col flex-1 overflow-hidden">
+    <div class="px-5 pt-5 pb-3 shrink-0">
+      <p class="text-text-muted text-sm leading-relaxed mb-1">Paste all your chapters below. The Archivist will read them and automatically extract characters, world rules, and unresolved plot threads.</p>
+      <p class="text-text-muted/60 text-xs">Separate chapters with a blank line or chapter heading. The more text, the better the extraction.</p>
+    </div>
+    <div class="flex-1 overflow-hidden px-5 pb-4">
+      <textarea id="import-text" placeholder="Paste your chapters here..." class="w-full h-full bg-surface border border-text-muted/30 text-text-body text-sm px-4 py-3 focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted resize-none font-display leading-relaxed"></textarea>
+    </div>
+    <div class="px-5 pb-6 shrink-0">
+      <button onclick="runImportAnalysis()" class="w-full bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider py-3 rounded-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+        <span class="icon" style="font-size:18px">auto_fix_high</span>
+        Analyze & Extract
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 2: Analyzing (loading) -->
+  <!-- FIX 2: Was "hidden flex-col" — hidden prevents flex from applying. Use explicit display toggle via JS instead. -->
+  <div id="import-step-loading" class="hidden flex-col flex-1 items-center justify-center px-8 text-center">
+    <div class="mb-6">
+      <div class="w-16 h-16 border-2 border-text-muted/20 border-t-primary rounded-full animate-spin mx-auto mb-6"></div>
+      <p id="import-loading-msg" class="font-display text-xl text-text-primary mb-2">Reading your story...</p>
+      <p class="text-text-muted text-sm">The Archivist is extracting lore and threads from your chapters. This may take 15–30 seconds.</p>
+    </div>
+  </div>
+
+  <!-- Step 3: Review results -->
+  <div id="import-step-review" class="hidden flex-col flex-1 overflow-hidden">
+    <div class="px-5 pt-4 pb-3 shrink-0 border-b border-text-muted/10">
+      <p class="text-text-primary font-semibold mb-0.5">Review Extracted Entries</p>
+      <p class="text-text-muted text-xs">Uncheck anything you don't want added. Then tap Commit.</p>
+      <div class="flex gap-3 mt-3">
+        <div id="import-lore-count" class="text-xs bg-surface border border-text-muted/30 px-3 py-1.5 rounded-sm text-text-muted"></div>
+        <div id="import-thread-count" class="text-xs bg-surface border border-text-muted/30 px-3 py-1.5 rounded-sm text-text-muted"></div>
+      </div>
+    </div>
+    <div id="import-review-list" class="flex-1 overflow-y-auto px-5 py-4 space-y-3 pb-28">
+      <!-- Extracted entries rendered here -->
+    </div>
+    <div class="fixed bottom-0 left-0 right-0 px-5 pb-6 pt-3 bg-bg-dark border-t border-text-muted/10">
+      <div class="flex gap-3">
+        <button onclick="resetImport()" class="flex-1 py-3 border border-text-muted/40 text-text-muted text-sm uppercase tracking-wider hover:border-text-primary transition-colors rounded-sm">Start Over</button>
+        <button onclick="commitImport()" class="flex-2 px-6 py-3 bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider hover:bg-primary/90 transition-colors rounded-sm flex items-center gap-2">
+          <span class="icon" style="font-size:18px">done_all</span>
+          Commit to Vault
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: CODEX (Main Dashboard) -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-codex" class="screen">
+  <!-- Header -->
+  <header class="flex items-center justify-between px-5 py-4 border-b border-text-muted/20 bg-bg-dark shrink-0">
+    <h1 id="codex-story-title" class="font-display text-2xl font-bold text-primary tracking-tight leading-none"></h1>
+    <div class="flex items-center gap-2">
+      <button onclick="goTo('search')" title="Search chapters" class="text-text-muted hover:text-primary transition-colors p-1">
+        <span class="icon">search</span>
+      </button>
+      <button onclick="goTo('import')" title="Import & Analyze Chapters" class="text-text-muted hover:text-primary transition-colors p-1">
+        <span class="icon">upload_file</span>
+      </button>
+      <button onclick="showSettings()" class="text-text-muted hover:text-text-primary transition-colors p-1">
+        <span class="icon">settings</span>
+      </button>
+    </div>
+  </header>
+  <!-- Word count goal bar (hidden when no goal set) -->
+  <div id="wordgoal-bar" class="hidden px-5 py-2 bg-bg-dark border-b border-text-muted/10 shrink-0">
+    <div class="flex items-center justify-between mb-1">
+      <span class="text-xs text-text-muted">Today's goal</span>
+      <span id="wordgoal-label" class="text-xs text-text-muted"></span>
+    </div>
+    <div class="h-1 bg-surface rounded-full overflow-hidden">
+      <div id="wordgoal-fill" class="h-full bg-primary rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+  </div>
+  <!-- Chapter List -->
+  <main class="flex-1 overflow-y-auto pb-24">
+    <div id="chapter-list" class="flex flex-col">
+      <!-- Chapters rendered here -->
+    </div>
+    <div id="chapter-empty" class="hidden flex-col items-center justify-center py-24 text-center px-8">
+      <span class="icon text-4xl text-text-muted mb-4" style="font-size:40px;">auto_stories</span>
+      <p class="text-text-muted font-display text-lg">No chapters penned.<br/>Begin the chronicle.</p>
+    </div>
+  </main>
+  <!-- FAB -->
+  <button onclick="openNewChapterModal()" class="fixed right-5 bottom-20 w-14 h-14 bg-bg-dark border border-primary text-primary flex items-center justify-center rounded-sm shadow-lg hover:bg-primary/10 transition-all duration-300 z-20">
+    <span class="icon text-3xl">add</span>
+  </button>
+  <button onclick="exportStory()" title="Export story" class="fixed left-5 bottom-20 w-14 h-14 bg-bg-dark border border-text-muted/30 text-text-muted flex items-center justify-center rounded-sm shadow-xl hover:border-primary hover:text-primary transition-all z-20">
+    <span class="icon" style="font-size:22px">download</span>
+  </button>
+  <!-- Bottom Nav -->
+  <div id="bottom-nav-codex" class="fixed bottom-0 left-0 right-0 z-30 bg-bg-dark border-t border-text-muted/20">
+    <div class="flex justify-around items-center px-4 pt-2 pb-3">
+      <button onclick="goTo('codex')" class="flex flex-col items-center gap-1 text-primary w-20">
+        <span class="icon" style="font-variation-settings:'FILL' 1">menu_book</span>
+        <span class="text-xs font-semibold tracking-wider uppercase">Codex</span>
+      </button>
+      <button onclick="goTo('lore')" class="flex flex-col items-center gap-1 text-text-muted hover:text-text-body transition-colors w-20">
+        <span class="icon">database</span>
+        <span class="text-xs tracking-wider uppercase">Lore</span>
+      </button>
+      <button onclick="goTo('threads')" class="flex flex-col items-center gap-1 text-text-muted hover:text-text-body transition-colors w-20 relative">
+        <span id="threads-badge" class="hidden absolute -top-1 right-2 w-2 h-2 bg-error rounded-full"></span>
+        <span class="icon">timeline</span>
+        <span class="text-xs tracking-wider uppercase">Threads</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: DRAFTING DESK -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-draft" class="screen">
+  <header class="flex items-center justify-between px-4 py-3 bg-bg-dark border-b border-text-muted/20 shrink-0 z-10">
+    <button onclick="saveDraftAndGoBack()" class="text-text-muted hover:text-text-primary p-1 transition-colors">
+      <span class="icon">arrow_back</span>
+    </button>
+    <h1 id="draft-chapter-title" class="font-display font-bold text-base text-text-primary tracking-wide truncate px-3 flex-1 text-center"></h1>
+    <button onclick="triggerCanonScan()" id="status-btn" class="p-2 flex items-center justify-center">
+      <div id="status-dot" class="status-dot status-clean"></div>
+    </button>
+  </header>
+  <!-- Editor -->
+  <main class="flex-1 overflow-y-auto px-5 py-6 bg-bg-dark">
+    <div id="draft-editor" contenteditable="true" data-placeholder="Write the next chapter..." spellcheck="false"
+      class="max-w-2xl mx-auto font-display text-[18px] text-text-body leading-relaxed outline-none min-h-full"
+      style="color: #CFC7B6; caret-color: #C2A46B;"
+      oninput="onEditorInput()">
+    </div>
+  </main>
+  <!-- Toolbar -->
+  <footer class="shrink-0 bg-surface border-t border-text-muted/20 px-3 py-2 flex items-center justify-between z-10">
+    <div class="flex items-center gap-1">
+      <button onclick="document.execCommand('undo')" class="p-2 text-text-muted hover:text-text-primary transition-colors">
+        <span class="icon" style="font-size:20px">undo</span>
+      </button>
+      <button onclick="document.execCommand('redo')" class="p-2 text-text-muted hover:text-text-primary transition-colors">
+        <span class="icon" style="font-size:20px">redo</span>
+      </button>
+      <div class="w-px h-5 bg-text-muted/30 mx-1"></div>
+      <button onclick="document.execCommand('bold')" class="p-2 text-text-muted hover:text-text-primary transition-colors">
+        <span class="icon" style="font-size:20px">format_bold</span>
+      </button>
+      <button onclick="document.execCommand('italic')" class="p-2 text-text-muted hover:text-text-primary transition-colors">
+        <span class="icon" style="font-size:20px">format_italic</span>
+      </button>
+      <div class="w-px h-5 bg-text-muted/30 mx-1"></div>
+      <!-- Text color picker -->
+      <div class="relative flex items-center">
+        <button onclick="document.getElementById('text-color-input').click()" title="Text color" class="p-2 text-text-muted hover:text-text-primary transition-colors flex flex-col items-center gap-0.5">
+          <span class="icon" style="font-size:20px">format_color_text</span>
+          <div id="color-swatch" class="w-4 h-1 rounded-full" style="background:#CFC7B6"></div>
+        </button>
+        <input id="text-color-input" type="color" value="#CFC7B6" oninput="applyTextColor(this.value)" class="absolute opacity-0 w-0 h-0 pointer-events-none"/>
+      </div>
+      <!-- Font size picker -->
+      <select onchange="applyFontSize(this.value)" title="Font size" class="bg-transparent text-text-muted text-xs border border-text-muted/20 rounded-sm px-1 py-1 hover:border-text-muted/50 transition-colors outline-none cursor-pointer ml-1" style="width:52px">
+        <option value="">Size</option>
+        <option value="1">14</option>
+        <option value="2">16</option>
+        <option value="3" selected>18</option>
+        <option value="4">20</option>
+        <option value="5">24</option>
+        <option value="6">28</option>
+      </select>
+    </div>
+    <button onclick="triggerCanonScan()" class="flex items-center gap-2 px-3 py-1.5 border border-primary/40 text-primary text-xs uppercase tracking-wider hover:bg-primary/10 transition-colors rounded-sm">
+      <span class="icon" style="font-size:16px">auto_fix_high</span>
+      Scan
+    </button>
+  </footer>
+  <!-- Canon Review Drawer -->
+  <div id="canon-overlay" class="overlay fixed inset-0 bg-black/60 z-40" onclick="closeCanonDrawer()"></div>
+  <div id="canon-drawer" class="drawer fixed top-0 right-0 h-full w-[88%] max-w-sm bg-surface border-l border-text-muted/30 z-50 flex flex-col shadow-2xl">
+    <header class="flex items-center justify-between p-4 border-b border-text-muted/20 shrink-0">
+      <div class="flex items-center gap-2">
+        <div>
+          <h2 class="font-display text-xl font-bold text-primary">Canon Review</h2>
+          <p class="text-[10px] uppercase tracking-widest text-text-muted">The Archivist remembers everything</p>
+        </div>
+        <span id="violation-count" class="hidden w-5 h-5 bg-error rounded-full text-white text-xs font-bold flex items-center justify-center"></span>
+      </div>
+      <button onclick="closeCanonDrawer()" class="text-text-muted hover:text-primary transition-colors">
+        <span class="icon">close</span>
+      </button>
+    </header>
+    <div id="canon-content" class="flex-1 overflow-y-auto p-4 space-y-4">
+      <!-- Violations rendered here -->
+    </div>
+  </div>
+  <!-- Lore Tooltip -->
+  <div id="lore-tooltip" class="hidden fixed z-50 bg-surface border border-text-muted/40 p-3 rounded-sm shadow-xl max-w-[220px] pointer-events-none">
+    <p id="tooltip-title" class="font-display font-bold text-sm text-text-primary mb-1"></p>
+    <p id="tooltip-desc" class="text-xs text-text-muted leading-relaxed"></p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: LORE VAULT -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-lore" class="screen">
+  <header class="bg-surface border-b border-text-muted/20 shrink-0 z-10">
+    <div class="flex items-center justify-between px-5 py-4">
+      <h1 class="font-display text-2xl font-bold text-text-primary w-full text-center">The Lore Vault</h1>
+    </div>
+    <div class="px-4 pb-3">
+      <div class="flex items-center gap-2 bg-bg-dark border border-text-muted/30 px-3 h-11 focus-within:border-primary transition-colors rounded-sm">
+        <span class="icon text-text-muted" style="font-size:20px">search</span>
+        <input id="lore-search" type="text" placeholder="Search the archives..." oninput="filterLore()" class="flex-1 bg-transparent text-text-body text-sm placeholder:text-text-muted outline-none"/>
+      </div>
+    </div>
+    <!-- FIX 3: Scoped lore tab buttons with id prefix to avoid cross-screen selector collisions -->
+    <div class="px-4 flex gap-5 border-t border-text-muted/10 overflow-x-auto no-scrollbar">
+      <button onclick="setLoreTab('all')" data-loretab="all" class="py-3 text-sm whitespace-nowrap tab-active">All Entries</button>
+      <button onclick="setLoreTab('character')" data-loretab="character" class="py-3 text-sm whitespace-nowrap tab-inactive">Characters</button>
+      <button onclick="setLoreTab('rule')" data-loretab="rule" class="py-3 text-sm whitespace-nowrap tab-inactive">World Rules</button>
+      <button onclick="setLoreTab('location')" data-loretab="location" class="py-3 text-sm whitespace-nowrap tab-inactive">Locations</button>
+      <button onclick="setLoreTab('artifact')" data-loretab="artifact" class="py-3 text-sm whitespace-nowrap tab-inactive">Artifacts</button>
+    </div>
+  </header>
+  <main id="lore-list" class="flex-1 overflow-y-auto px-4 py-5 pb-28 space-y-3">
+    <!-- Lore entries rendered here -->
+  </main>
+  <div id="lore-empty" class="hidden flex-col items-center justify-center py-24 text-center px-8">
+    <span class="icon text-4xl text-text-muted mb-4" style="font-size:40px">book_2</span>
+    <p class="text-text-muted font-display text-lg">This vault is empty.<br/>Log your first rule.</p>
+  </div>
+  <!-- FAB -->
+  <button onclick="openAddLoreModal()" class="fixed right-5 bottom-20 w-14 h-14 bg-bg-dark border border-primary text-primary flex items-center justify-center rounded-sm shadow-lg hover:bg-primary/10 transition-all duration-300 z-20">
+    <span class="icon text-3xl">add</span>
+  </button>
+  <!-- Bottom Nav Lore -->
+  <div class="fixed bottom-0 left-0 right-0 z-30 bg-bg-dark border-t border-text-muted/20">
+    <div class="flex justify-around items-center px-4 pt-2 pb-3">
+      <button onclick="goTo('codex')" class="flex flex-col items-center gap-1 text-text-muted hover:text-text-body w-20">
+        <span class="icon">menu_book</span><span class="text-xs tracking-wider uppercase">Codex</span>
+      </button>
+      <button onclick="goTo('lore')" class="flex flex-col items-center gap-1 text-primary w-20">
+        <span class="icon" style="font-variation-settings:'FILL' 1">database</span><span class="text-xs font-semibold tracking-wider uppercase">Lore</span>
+      </button>
+      <button onclick="goTo('threads')" class="flex flex-col items-center gap-1 text-text-muted hover:text-text-body w-20 relative">
+        <span id="threads-badge-lore" class="hidden absolute -top-1 right-2 w-2 h-2 bg-error rounded-full"></span>
+        <span class="icon">timeline</span><span class="text-xs tracking-wider uppercase">Threads</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: THREAD TRACKER -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-threads" class="screen">
+  <header class="sticky top-0 bg-bg-dark/95 backdrop-blur border-b border-text-muted/20 px-5 py-4 flex items-center justify-between shrink-0 z-10">
+    <h1 class="font-display text-2xl font-bold text-text-primary">Thread Tracker</h1>
+    <button onclick="openAddThreadModal()" class="text-text-muted hover:text-primary transition-colors p-1">
+      <span class="icon">add</span>
+    </button>
+  </header>
+  <main id="thread-list" class="flex-1 overflow-y-auto px-5 py-6 pb-24">
+    <!-- Threads rendered here -->
+  </main>
+  <div id="thread-empty" class="hidden flex-col items-center justify-center py-24 text-center px-8">
+    <span class="icon text-4xl text-text-muted mb-4" style="font-size:40px">linear_scale</span>
+    <p class="text-text-muted font-display text-lg">No tangled threads yet.</p>
+  </div>
+  <!-- Bottom Nav Threads -->
+  <div class="fixed bottom-0 left-0 right-0 z-30 bg-bg-dark border-t border-text-muted/20">
+    <div class="flex justify-around items-center px-4 pt-2 pb-3">
+      <button onclick="goTo('codex')" class="flex flex-col items-center gap-1 text-text-muted hover:text-text-body w-20">
+        <span class="icon">menu_book</span><span class="text-xs tracking-wider uppercase">Codex</span>
+      </button>
+      <button onclick="goTo('lore')" class="flex flex-col items-center gap-1 text-text-muted hover:text-text-body w-20">
+        <span class="icon">database</span><span class="text-xs tracking-wider uppercase">Lore</span>
+      </button>
+      <button onclick="goTo('threads')" class="flex flex-col items-center gap-1 text-primary w-20">
+        <span class="icon" style="font-variation-settings:'FILL' 1">timeline</span><span class="text-xs font-semibold tracking-wider uppercase">Threads</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SCREEN: SEARCH -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<div id="screen-search" class="screen">
+  <header class="flex items-center gap-3 px-4 py-3 border-b border-text-muted/20 bg-bg-dark shrink-0">
+    <button onclick="goTo('codex')" class="text-text-muted hover:text-text-primary transition-colors p-1 shrink-0">
+      <span class="icon">arrow_back</span>
+    </button>
+    <div class="flex items-center gap-2 flex-1 bg-surface border border-text-muted/30 px-3 h-11 focus-within:border-primary transition-colors rounded-sm">
+      <span class="icon text-text-muted" style="font-size:20px">search</span>
+      <input id="chapter-search-input" type="text" placeholder="Search across all chapters..."
+        oninput="runChapterSearch()"
+        class="flex-1 bg-transparent text-text-body text-sm placeholder:text-text-muted outline-none"/>
+    </div>
+  </header>
+  <main id="search-results" class="flex-1 overflow-y-auto px-5 py-4 pb-8 space-y-3">
+    <div class="text-center py-20">
+      <span class="icon text-text-muted mb-3 block" style="font-size:40px">manage_search</span>
+      <p class="text-text-muted text-sm">Type to search your prose.</p>
+    </div>
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- MODALS -->
+<!-- ══════════════════════════════════════════════════════════ -->
+
+<!-- New Chapter Modal -->
+<div id="modal-overlay" class="overlay fixed inset-0 bg-black/70 z-50" onclick="closeAllModals()"></div>
+
+<div id="modal-new-chapter" class="modal fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-lg">
+  <div class="w-10 h-1 bg-text-muted/40 rounded-full mx-auto mt-3 mb-4"></div>
+  <div class="px-5 pb-8 space-y-4">
+    <h3 class="font-display text-xl font-bold text-text-primary">New Chapter</h3>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Chapter Title</label>
+      <input id="new-chapter-title" type="text" placeholder="e.g. The Rain Chapter" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Chapter Number</label>
+      <input id="new-chapter-num" type="number" placeholder="7" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Synopsis <span class="normal-case text-text-muted/50">(private note, optional)</span></label>
+      <input id="new-chapter-synopsis" type="text" placeholder="e.g. MC discovers the rain rule has an exception..." class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <button onclick="createChapter()" class="w-full bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider py-3 rounded-sm hover:bg-primary/90 transition-colors">
+      Create Chapter
+    </button>
+  </div>
+</div>
+
+<!-- Add Lore Modal -->
+<div id="modal-add-lore" class="modal fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-lg">
+  <div class="w-10 h-1 bg-text-muted/40 rounded-full mx-auto mt-3 mb-4"></div>
+  <div class="px-5 pb-8 space-y-4">
+    <h3 class="font-display text-xl font-bold text-text-primary">Inscribe to Vault</h3>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Entry Name</label>
+      <input id="lore-name" type="text" placeholder="e.g. Haruki" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Category</label>
+      <select id="lore-category" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm">
+        <option value="character">Character</option>
+        <option value="rule">World Rule</option>
+        <option value="location">Location</option>
+        <option value="artifact">Artifact</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Description / Rules</label>
+      <textarea id="lore-desc" rows="3" placeholder="Describe this entry and its rules..." class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted resize-none"></textarea>
+    </div>
+    <button onclick="saveLoreEntry()" class="w-full bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider py-3 rounded-sm hover:bg-primary/90 transition-colors">
+      Inscribe
+    </button>
+  </div>
+</div>
+
+<!-- Add Thread Modal -->
+<div id="modal-add-thread" class="modal fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-lg">
+  <div class="w-10 h-1 bg-text-muted/40 rounded-full mx-auto mt-3 mb-4"></div>
+  <div class="px-5 pb-8 space-y-4">
+    <h3 class="font-display text-xl font-bold text-text-primary">Add Plot Thread</h3>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Thread Name</label>
+      <input id="thread-name" type="text" placeholder="e.g. Riku's missing cola debt" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Introduced in Chapter #</label>
+      <input id="thread-origin" type="number" placeholder="3" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Last Mentioned in Chapter #</label>
+      <input id="thread-last" type="number" placeholder="3" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <button onclick="saveThread()" class="w-full bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider py-3 rounded-sm hover:bg-primary/90 transition-colors">
+      Track Thread
+    </button>
+  </div>
+</div>
+
+<!-- Lore Detail Modal -->
+<div id="modal-lore-detail" class="modal fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-lg max-h-[80dvh] flex flex-col">
+  <div class="w-10 h-1 bg-text-muted/40 rounded-full mx-auto mt-3 mb-2 shrink-0"></div>
+  <div class="px-5 pb-6 flex-1 overflow-y-auto">
+    <div class="flex items-start justify-between mb-4">
+      <span id="lore-detail-tag" class="text-xs uppercase tracking-widest text-text-muted border border-text-muted/30 px-2 py-0.5 rounded-sm"></span>
+      <button onclick="closeAllModals()" class="text-text-muted hover:text-text-primary ml-4"><span class="icon" style="font-size:20px">close</span></button>
+    </div>
+    <h2 id="lore-detail-name" class="font-display text-3xl font-bold text-text-primary mb-3"></h2>
+    <p id="lore-detail-desc" class="text-text-body text-base leading-relaxed"></p>
+    <div class="mt-6 flex gap-3">
+      <button onclick="deleteLoreEntry()" class="flex-1 py-2.5 border border-error/50 text-error text-xs uppercase tracking-wider hover:bg-error/10 transition-colors rounded-sm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Thread Detail Modal -->
+<div id="modal-thread-detail" class="modal fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-lg">
+  <div class="w-10 h-1 bg-text-muted/40 rounded-full mx-auto mt-3 mb-4"></div>
+  <div class="px-5 pb-8 space-y-4">
+    <div class="flex items-center justify-between">
+      <h3 id="thread-detail-name" class="font-display text-xl font-bold text-text-primary"></h3>
+      <button onclick="closeAllModals()"><span class="icon text-text-muted" style="font-size:20px">close</span></button>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Update Last Mentioned Chapter</label>
+      <input id="thread-update-last" type="number" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm"/>
+    </div>
+    <div class="flex gap-3">
+      <button onclick="resolveThread()" class="flex-1 py-2.5 bg-highlight/20 border border-highlight text-highlight text-xs uppercase tracking-wider hover:bg-highlight/30 transition-colors rounded-sm">Mark Resolved</button>
+      <button onclick="updateThread()" class="flex-1 py-2.5 bg-primary text-bg-dark text-xs font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors rounded-sm">Update</button>
+    </div>
+    <button onclick="deleteThread()" class="w-full py-2 border border-error/30 text-error/70 text-xs uppercase tracking-wider hover:bg-error/10 transition-colors rounded-sm">Delete Thread</button>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="modal-settings" class="modal fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-lg">
+  <div class="w-10 h-1 bg-text-muted/40 rounded-full mx-auto mt-3 mb-4"></div>
+  <div class="px-5 pb-8 space-y-4">
+    <h3 class="font-display text-xl font-bold text-text-primary">Settings</h3>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Story Title</label>
+      <input id="settings-title" type="text" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm"/>
+    </div>
+    <div>
+      <label class="text-xs uppercase tracking-widest text-text-muted mb-2 block">Daily Word Goal</label>
+      <input id="settings-wordgoal" type="number" min="0" placeholder="e.g. 500" class="w-full bg-bg-dark border border-text-muted/30 text-text-primary px-4 py-3 text-sm focus:border-primary focus:outline-none transition-colors rounded-sm placeholder:text-text-muted"/>
+    </div>
+    <button onclick="saveSettings()" class="w-full bg-primary text-bg-dark font-bold text-sm uppercase tracking-wider py-3 rounded-sm">Save</button>
+    <button onclick="clearAllData()" class="w-full py-2.5 border border-error/40 text-error text-xs uppercase tracking-wider hover:bg-error/10 transition-colors rounded-sm">Clear All Data</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- APP LOGIC -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<script>
+// ─── CONFIG ────────────────────────────────────────────────
+// The OpenRouter API key lives server-side only (Vercel env var) — see /api/archivist.js.
+
+// ─── STATE ─────────────────────────────────────────────────
+let state = {
+  storyTitle: '',
+  chapters: [],   // { id, num, title, synopsis, content, wordCount }
+  lore: [],       // { id, name, category, desc }
+  threads: [],    // { id, name, originChapter, lastChapter, resolved }
+  wordGoal: 0,
+  sessionWords: 0,
+  sessionDate: '',
+  currentChapterId: null,
+  loreTab: 'all',
+  loreSearch: '',
+  selectedLoreId: null,
+  selectedThreadId: null,
+};
+
+// ─── PERSISTENCE ────────────────────────────────────────────
+function save() {
+  localStorage.setItem('archivist_state', JSON.stringify({
+    storyTitle: state.storyTitle,
+    chapters: state.chapters,
+    lore: state.lore,
+    threads: state.threads,
+    wordGoal: state.wordGoal,
+    sessionWords: state.sessionWords,
+    sessionDate: state.sessionDate,
+  }));
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem('archivist_state');
+    if (raw) {
+      const saved = JSON.parse(raw);
+      Object.assign(state, saved);
+    }
+  } catch (e) {
+    console.warn('Failed to load saved state:', e);
+  }
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ─── SETUP ──────────────────────────────────────────────────
+function handleSetup() {
+  const title = document.getElementById('story-title-input').value.trim();
+  if (!title) {
+    document.getElementById('setup-error').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('setup-error').classList.add('hidden');
+  state.storyTitle = title;
+  save();
+  initApp();
+}
+
+function initApp() {
+  // Reset session word count if it's a new day
+  const today = new Date().toDateString();
+  if (state.sessionDate !== today) {
+    state.sessionWords = 0;
+    state.sessionDate = today;
+    save();
+  }
+  document.getElementById('screen-setup').classList.remove('active');
+  document.getElementById('codex-story-title').textContent = state.storyTitle;
+  renderChapters();
+  renderLore();
+  renderThreads();
+  updateWordGoalBar();
+  goTo('codex');
+}
+
+// ─── NAVIGATION ─────────────────────────────────────────────
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  if (screen === 'lore') { filterLore(); }
+  if (screen === 'threads') { renderThreads(); }
+  if (screen === 'codex') { renderChapters(); }
+}
+
+// ─── WORD GOAL BAR ──────────────────────────────────────────
+function updateWordGoalBar() {
+  const bar = document.getElementById('wordgoal-bar');
+  const fill = document.getElementById('wordgoal-fill');
+  const label = document.getElementById('wordgoal-label');
+  if (!bar) return;
+  if (!state.wordGoal || state.wordGoal <= 0) {
+    bar.classList.add('hidden');
+    return;
+  }
+  bar.classList.remove('hidden');
+  const pct = Math.min(100, Math.round((state.sessionWords / state.wordGoal) * 100));
+  fill.style.width = pct + '%';
+  fill.style.background = pct >= 100 ? '#7E9670' : '#C2A46B';
+  label.textContent = `${state.sessionWords} / ${state.wordGoal} words${pct >= 100 ? ' · reached' : ''}`;
+}
+
+// ─── CHAPTER SEARCH ─────────────────────────────────────────
+function runChapterSearch() {
+  const query = document.getElementById('chapter-search-input').value.trim().toLowerCase();
+  const results = document.getElementById('search-results');
+  if (!query) {
+    results.innerHTML = `<div class="text-center py-20"><span class="icon text-text-muted mb-3 block" style="font-size:40px">manage_search</span><p class="text-text-muted text-sm">Type to search your prose.</p></div>`;
+    return;
+  }
+  const matches = [];
+  state.chapters.forEach(ch => {
+    const plainText = ch.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    const lower = plainText.toLowerCase();
+    let idx = 0;
+    while ((idx = lower.indexOf(query, idx)) !== -1) {
+      const start = Math.max(0, idx - 60);
+      const end = Math.min(plainText.length, idx + query.length + 60);
+      const snippet = (start > 0 ? '…' : '') + plainText.slice(start, end) + (end < plainText.length ? '…' : '');
+      const highlighted = snippet.replace(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark class="bg-primary/30 text-text-primary rounded-sm px-0.5">${m}</mark>`);
+      matches.push({ ch, snippet: highlighted });
+      idx += query.length;
+      if (matches.filter(m => m.ch.id === ch.id).length >= 3) break; // max 3 per chapter
+    }
+  });
+  if (matches.length === 0) {
+    results.innerHTML = `<div class="text-center py-20"><span class="icon text-text-muted mb-3 block" style="font-size:40px">search_off</span><p class="text-text-muted text-sm">No results for "${query}".</p></div>`;
+    return;
+  }
+  // Group by chapter
+  const byChapter = {};
+  matches.forEach(m => {
+    if (!byChapter[m.ch.id]) byChapter[m.ch.id] = { ch: m.ch, snippets: [] };
+    byChapter[m.ch.id].snippets.push(m.snippet);
+  });
+  results.innerHTML = `<p class="text-xs text-text-muted uppercase tracking-widest mb-4">${matches.length} result${matches.length!==1?'s':''} across ${Object.keys(byChapter).length} chapter${Object.keys(byChapter).length!==1?'s':''}</p>` +
+    Object.values(byChapter).map(({ ch, snippets }) => `
+      <div class="bg-surface rounded-sm border border-text-muted/20 overflow-hidden mb-3 slide-in">
+        <button onclick="openDraft('${ch.id}')" class="w-full flex items-center gap-3 px-4 py-3 border-b border-text-muted/10 hover:bg-surface-raised transition-colors text-left">
+          <span class="icon text-primary" style="font-size:18px">description</span>
+          <span class="font-display font-bold text-text-primary text-sm">Ch. ${ch.num}: ${ch.title}</span>
+          <span class="icon text-text-muted/40 ml-auto" style="font-size:16px">chevron_right</span>
+        </button>
+        ${snippets.map(s => `<p class="px-4 py-3 text-sm text-text-muted font-display leading-relaxed border-b border-text-muted/5 last:border-0">${s}</p>`).join('')}
+      </div>`).join('');
+}
+
+// ─── EXPORT ─────────────────────────────────────────────────
+function exportStory() {
+  if (state.chapters.length === 0) { showToast('Nothing to export yet.'); return; }
+  const sorted = [...state.chapters].sort((a, b) => a.num - b.num);
+  let text = state.storyTitle.toUpperCase() + '\n' + '═'.repeat(state.storyTitle.length) + '\n\n';
+  sorted.forEach(ch => {
+    text += `Chapter ${ch.num}: ${ch.title}\n`;
+    text += '─'.repeat(40) + '\n';
+    if (ch.synopsis) text += `[${ch.synopsis}]\n\n`;
+    // Strip HTML tags for plain text export
+    const plain = ch.content.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+    text += plain + '\n\n\n';
+  });
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${state.storyTitle.replace(/[^a-z0-9]/gi, '_')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Story exported as .txt');
+}
+
+// ─── CHAPTERS ───────────────────────────────────────────────
+function renderChapters() {
+  const list = document.getElementById('chapter-list');
+  const empty = document.getElementById('chapter-empty');
+  list.innerHTML = '';
+  if (state.chapters.length === 0) {
+    empty.classList.remove('hidden'); empty.classList.add('flex');
+    return;
+  }
+  empty.classList.add('hidden'); empty.classList.remove('flex');
+  const sorted = [...state.chapters].sort((a,b) => b.num - a.num);
+  sorted.forEach(ch => {
+    const el = document.createElement('button');
+    el.className = 'flex items-center gap-4 px-5 min-h-[76px] py-3 border-b border-text-muted/15 hover:bg-surface/50 transition-colors text-left w-full group';
+    el.innerHTML = `
+      <div class="flex items-center justify-center w-11 h-11 bg-surface rounded-sm text-text-muted shrink-0 group-hover:text-primary transition-colors">
+        <span class="icon" style="font-size:22px">description</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-text-primary font-medium text-base leading-tight mb-0.5 group-hover:text-white transition-colors">Ch. ${ch.num}: ${ch.title}</p>
+        <p class="text-text-muted text-sm">${ch.synopsis ? `<span class="text-text-muted/70 italic truncate block">${ch.synopsis}</span>` : `${ch.wordCount || 0} words`}</p>
+      </div>
+      <span class="icon text-text-muted/40 group-hover:text-primary/60 transition-colors shrink-0">chevron_right</span>
+    `;
+    el.onclick = () => openDraft(ch.id);
+    list.appendChild(el);
+  });
+}
+
+function openNewChapterModal() {
+  const next = state.chapters.length > 0 ? Math.max(...state.chapters.map(c=>c.num)) + 1 : 1;
+  document.getElementById('new-chapter-num').value = next;
+  document.getElementById('new-chapter-title').value = '';
+  document.getElementById('new-chapter-synopsis').value = '';
+  openModal('new-chapter');
+}
+
+function createChapter() {
+  const title = document.getElementById('new-chapter-title').value.trim();
+  const num = parseInt(document.getElementById('new-chapter-num').value) || 1;
+  const synopsis = document.getElementById('new-chapter-synopsis').value.trim();
+  if (!title) return;
+  const ch = { id: uid(), num, title, synopsis, content: '', wordCount: 0 };
+  state.chapters.push(ch);
+  save();
+  closeAllModals();
+  openDraft(ch.id);
+}
+
+function openDraft(id) {
+  const ch = state.chapters.find(c => c.id === id);
+  if (!ch) return;
+  state.currentChapterId = id;
+  document.getElementById('draft-chapter-title').textContent = `Ch. ${ch.num}: ${ch.title}`;
+  const editor = document.getElementById('draft-editor');
+  editor.innerHTML = ch.content || '';
+  prevWordCount = ch.wordCount || 0;
+  setStatus('clean');
+  goTo('draft');
+}
+
+// FIX 5: Save draft before navigating back so no data is lost on back button press
+function saveDraftAndGoBack() {
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (ch) {
+    const editor = document.getElementById('draft-editor');
+    ch.content = editor.innerHTML;
+    ch.wordCount = editor.innerText.trim().split(/\s+/).filter(Boolean).length;
+    save();
+  }
+  goTo('codex');
+}
+
+let saveTimer;
+let prevWordCount = 0;
+function onEditorInput() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const ch = state.chapters.find(c => c.id === state.currentChapterId);
+    if (ch) {
+      const editor = document.getElementById('draft-editor');
+      const newCount = editor.innerText.trim().split(/\s+/).filter(Boolean).length;
+      const diff = Math.max(0, newCount - prevWordCount);
+      prevWordCount = newCount;
+      ch.content = editor.innerHTML;
+      ch.wordCount = newCount;
+      // Accumulate session words (only count additions, not deletions)
+      if (diff > 0) {
+        state.sessionWords = (state.sessionWords || 0) + diff;
+        updateWordGoalBar();
+      }
+      save();
+    }
+  }, 800);
+}
+
+// ─── TEXT COLOR & FONT SIZE ─────────────────────────────────
+function applyTextColor(color) {
+  document.getElementById('color-swatch').style.background = color;
+  document.getElementById('draft-editor').focus();
+  document.execCommand('foreColor', false, color);
+}
+
+function applyFontSize(size) {
+  if (!size) return;
+  document.getElementById('draft-editor').focus();
+  document.execCommand('fontSize', false, size);
+  // Reset select to show "Size" placeholder after applying
+  const sel = document.querySelector('select[title="Font size"]');
+  if (sel) setTimeout(() => { sel.value = ''; }, 50);
+}
+
+// ─── STATUS DOT ─────────────────────────────────────────────
+function setStatus(status) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot';
+  dot.classList.add('status-' + status);
+}
+
+// ─── CANON SCAN ─────────────────────────────────────────────
+let scanDebounce;
+function triggerCanonScan() {
+  clearTimeout(scanDebounce);
+  scanDebounce = setTimeout(runCanonScan, 300);
+}
+
+async function runCanonScan() {
+  const editor = document.getElementById('draft-editor');
+  const draftText = editor.innerText.trim();
+  if (!draftText || draftText.length < 30) return;
+  if (state.lore.length === 0) {
+    openCanonDrawer();
+    document.getElementById('canon-content').innerHTML = `
+      <div class="text-center py-8">
+        <span class="icon text-3xl text-highlight mb-3 block">auto_stories</span>
+        <p class="text-text-muted text-sm">Add lore entries first so The Archivist has rules to check against.</p>
+      </div>`;
+    document.getElementById('violation-count').classList.add('hidden');
+    return;
+  }
+
+  setStatus('scanning');
+  openCanonDrawer();
+  document.getElementById('violation-count').classList.add('hidden');
+  document.getElementById('canon-content').innerHTML = `
+    <p class="text-xs text-text-muted uppercase tracking-widest mb-4">Scanning your draft...</p>
+    <div class="space-y-3">
+      ${[1,2,3].map(()=>`
+        <div class="bg-bg-dark rounded-sm p-4 space-y-2">
+          <div class="shimmer h-4 w-2/3 rounded"></div>
+          <div class="shimmer h-3 w-full rounded"></div>
+          <div class="shimmer h-3 w-4/5 rounded"></div>
+        </div>`).join('')}
+    </div>`;
+
+  const loreContext = state.lore.map(l => `• [${l.category.toUpperCase()}] ${l.name}: ${l.desc}`).join('\n');
+
+  const systemPrompt = `You are The Archivist — a grumpy, sharp-tongued continuity editor who has memorised every word of this story and takes canon violations as a personal insult. You catch mistakes with attitude and wit, like a loyal friend who's read every chapter and can't believe you forgot your own lore.
+
+Your personality rules:
+- Punch at the MISTAKE, never the writer. The error is the villain, not the person.
+- Be specific and reference the source ("Chapter 4, remember?", "You literally wrote this three chapters ago").
+- Use dry humour, mild exasperation, the occasional "mate" or "seriously".
+- Keep callouts SHORT — one or two punchy sentences max. No lectures.
+- End on a constructive note, never pure negativity. You want the story to succeed.
+- When there are NO violations: be genuinely pleased, maybe a little smug about it.
+
+Examples of good callouts:
+- "His eyes were RED. You wrote it yourself in Chapter 2. Blue eyes are for the other guy."
+- "She can't teleport. That's literally Rule 1 of this world. Where did this come from?"
+- "The palace is north of the river. Always has been. Did the river move? No. Fix the palace."`;
+
+  const userPrompt = `Analyze this chapter draft against the established lore and return a JSON object with two keys: "violations" and "newLore".
+
+ESTABLISHED LORE:
+${loreContext}
+
+CHAPTER DRAFT:
+${draftText}
+
+"violations": array of continuity issues. Each: { "type": "short label", "draftExcerpt": "the problematic text (max 20 words)", "establishedLore": "the rule it violates", "loreName": "lore entry name", "suggestedFix": "a corrected rewrite of just the draftExcerpt that resolves the violation (max 30 words)", "callout": "The Archivist's in-character voiced reaction to this specific mistake — punchy, specific, referencing where the real lore was established (1-2 sentences max)" }
+
+"newLore": array of NEW facts, rules, characters, or world details mentioned in this draft that are NOT already in the established lore above and would be worth tracking. Each: { "name": "entry name", "category": "character|rule|location|artifact", "desc": "what was established in this draft" }
+
+If no violations, return "violations": []. If no new lore, return "newLore": [].
+Return ONLY the JSON object. No explanation. No markdown.`;
+
+  try {
+    const res = await fetch('/api/archivist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'scan', systemPrompt, userPrompt })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Something went wrong. Try again.');
+    const parsed = data.result;
+    // Support both old array format and new object format
+    const violations = Array.isArray(parsed) ? parsed : (parsed.violations || []);
+    const newLore = Array.isArray(parsed) ? [] : (parsed.newLore || []);
+    renderViolations(violations, newLore);
+  } catch (err) {
+    setStatus('clean');
+    document.getElementById('canon-content').innerHTML = `
+      <div class="text-center py-8">
+        <span class="icon text-2xl text-error mb-2 block">error</span>
+        <p class="text-error text-sm mb-1">I couldn't finish the scan.</p>
+        <p class="text-text-muted text-xs leading-relaxed">${err.message || 'Something went wrong. Try again.'}</p>
+      </div>`;
+  }
+}
+
+function renderViolations(violations, newLore = []) {
+  const content = document.getElementById('canon-content');
+  const countBadge = document.getElementById('violation-count');
+
+  // All clear — no violations, no new lore
+  if ((!violations || violations.length === 0) && newLore.length === 0) {
+    setStatus('clean');
+    countBadge.classList.add('hidden');
+    const allClearLines = [
+      { icon: 'verified', msg: "Clean. Suspiciously clean.", sub: "Not a single continuity error. I'm almost impressed." },
+      { icon: 'verified', msg: "The canon holds.", sub: "Everything checks out. Don't get used to this." },
+      { icon: 'verified', msg: "I've got nothing.", sub: "No mistakes. This chapter actually respects its own lore. Well done." },
+      { icon: 'verified', msg: "Spotless.", sub: "Not one contradiction. Go take a break, you've earned it." },
+    ];
+    const pick = allClearLines[Math.floor(Math.random() * allClearLines.length)];
+    content.innerHTML = `
+      <div class="text-center py-12">
+        <span class="icon text-[#8AA17E] mb-3 block" style="font-size:40px">verified</span>
+        <p class="font-display text-lg text-text-primary mb-1">${pick.msg}</p>
+        <p class="text-text-muted text-sm">${pick.sub}</p>
+      </div>`;
+    return;
+  }
+
+  if (violations.length > 0) {
+    setStatus('violation');
+    countBadge.textContent = violations.length;
+    countBadge.classList.remove('hidden');
+  } else {
+    setStatus('clean');
+    countBadge.classList.add('hidden');
+  }
+
+  let html = '';
+
+  if (violations.length > 0) {
+    const openers = [
+      `Found ${violations.length} problem${violations.length>1?'s':''}.`,
+      `${violations.length} issue${violations.length>1?'s, and I\'m not happy':' — fix it'}.`,
+      `${violations.length} thing${violations.length>1?'s':''} wrong. Let's go.`,
+    ];
+    const opener = openers[Math.floor(Math.random() * openers.length)];
+    html += `<p class="text-xs text-text-muted uppercase tracking-widest mb-4">${opener}</p>`;
+
+    html += violations.map((v, i) => `
+      <article id="violation-${i}" class="violation-card bg-bg-dark rounded-sm overflow-hidden slide-in mb-4" style="animation-delay:${i*80}ms">
+        ${v.callout ? `
+        <div class="px-4 py-3 border-b border-error/20 bg-error/5">
+          <p class="font-display text-text-primary text-base leading-snug italic">"${v.callout}"</p>
+          <p class="text-[10px] uppercase tracking-widest text-error/60 mt-1.5">— The Archivist</p>
+        </div>` : `
+        <div class="px-4 py-3 border-b border-text-muted/10">
+          <h3 class="font-display font-bold text-text-primary text-base">${v.type}</h3>
+        </div>`}
+        <div class="p-4 space-y-3 text-sm">
+          <div class="pl-3 border-l border-text-muted/30">
+            <p class="text-[10px] uppercase tracking-widest text-text-muted mb-1.5">What you wrote</p>
+            <p class="font-display italic text-text-body leading-relaxed">"${v.draftExcerpt}"</p>
+          </div>
+          <div class="flex justify-center"><span class="icon text-text-muted/40" style="font-size:18px">swap_vert</span></div>
+          <div class="pl-3 border-l border-primary/50 bg-primary/5 py-2 pr-2 rounded-r-sm">
+            <p class="text-[10px] uppercase tracking-widest text-primary mb-1.5">What the vault says</p>
+            <p class="font-display text-text-body leading-relaxed">${v.establishedLore}</p>
+            <p class="text-[11px] text-text-muted mt-1.5 flex items-center gap-1"><span class="icon" style="font-size:12px">book</span> ${v.loreName}</p>
+          </div>
+          ${v.suggestedFix ? `
+          <div class="pl-3 border-l border-highlight bg-highlight/10 py-2 pr-2 rounded-r-sm">
+            <p class="text-[10px] uppercase tracking-widest text-highlight mb-1.5">Here's how to fix it</p>
+            <p class="font-display text-text-body leading-relaxed italic">"${v.suggestedFix}"</p>
+            <button onclick="applyFix('${v.draftExcerpt.replace(/'/g,"\\'")}','${v.suggestedFix.replace(/'/g,"\\'")}',${i})" class="mt-2 flex items-center gap-1 text-[11px] uppercase tracking-wider text-highlight hover:text-text-primary transition-colors">
+              <span class="icon" style="font-size:13px">check_circle</span> Apply Fix
+            </button>
+          </div>` : ''}
+        </div>
+        <div class="flex gap-2 p-3 bg-surface/50 border-t border-text-muted/10">
+          <button onclick="acknowledgeViolation(${i})" class="flex-1 py-2 border border-text-muted/50 text-text-muted text-xs uppercase tracking-wider hover:border-primary hover:text-primary transition-colors rounded-sm flex items-center justify-center gap-1">
+            <span class="icon" style="font-size:16px">done</span> Got it
+          </button>
+          <button onclick="goToLoreAndEdit('${v.loreName}')" class="flex-1 py-2 bg-bg-dark border border-text-muted/30 text-text-body text-xs uppercase tracking-wider hover:border-primary transition-colors rounded-sm flex items-center justify-center gap-1">
+            <span class="icon" style="font-size:16px">edit</span> Edit Rule
+          </button>
+        </div>
+      </article>`).join('');
+  }
+
+  if (newLore.length > 0) {
+    html += `
+      <div class="mt-2 mb-3 flex items-center gap-3">
+        <p class="text-xs uppercase tracking-widest text-highlight whitespace-nowrap">New Lore Discovered (${newLore.length})</p>
+        <div class="h-px bg-highlight/30 flex-1"></div>
+      </div>
+      <p class="text-text-muted text-xs mb-3 leading-relaxed">New facts in this draft not yet in your vault. Log them before you forget.</p>`;
+    html += newLore.map((l, i) => `
+      <div id="new-lore-${i}" class="bg-bg-dark rounded-sm border border-highlight/30 p-3 mb-2 slide-in" style="animation-delay:${(violations.length + i)*60}ms">
+        <div class="flex items-start justify-between gap-2 mb-1">
+          <p class="font-display font-bold text-text-primary text-sm leading-tight">${l.name}</p>
+          <span class="text-[10px] uppercase tracking-wider text-highlight border border-highlight/40 px-2 py-0.5 rounded-sm shrink-0">${l.category}</span>
+        </div>
+        <p class="text-xs text-text-muted leading-relaxed mb-2">${l.desc}</p>
+        <button onclick="addDiscoveredLore(${i}, '${l.name.replace(/'/g,"\\'")}','${l.category}','${l.desc.replace(/'/g,"\\'")}')"
+          class="flex items-center gap-1 text-[11px] uppercase tracking-wider text-highlight hover:text-text-primary transition-colors">
+          <span class="icon" style="font-size:13px">add_circle</span> Add to Vault
+        </button>
+      </div>`).join('');
+  }
+
+  content.innerHTML = html;
+}
+
+// ─── APPLY FIX ───────────────────────────────────────────────
+function applyFix(original, fix, violationIdx) {
+  const editor = document.getElementById('draft-editor');
+  // Walk text nodes and replace the first occurrence of the excerpt
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const idx = node.textContent.indexOf(original);
+    if (idx !== -1) {
+      const after = node.splitText(idx + original.length);
+      const matched = node.splitText(idx);
+      matched.textContent = fix;
+      break;
+    }
+  }
+  // Trigger save
+  const ch = state.chapters.find(c => c.id === state.currentChapterId);
+  if (ch) {
+    ch.content = editor.innerHTML;
+    ch.wordCount = editor.innerText.trim().split(/\s+/).filter(Boolean).length;
+    save();
+  }
+  acknowledgeViolation(violationIdx);
+  showToast('Fix applied to draft.');
+}
+
+// ─── ADD DISCOVERED LORE ─────────────────────────────────────
+function addDiscoveredLore(idx, name, category, desc) {
+  if (!state.lore.find(l => l.name.toLowerCase() === name.toLowerCase())) {
+    state.lore.push({ id: uid(), name, category, desc });
+    save();
+  }
+  const el = document.getElementById('new-lore-' + idx);
+  if (el) {
+    el.style.opacity = '0'; el.style.transition = 'opacity 0.25s';
+    setTimeout(() => el.remove(), 250);
+  }
+  showToast(`"${name}" added to Lore Vault.`);
+}
+
+function acknowledgeViolation(i) {
+  const el = document.getElementById('violation-' + i);
+  if (el) { el.style.opacity='0'; el.style.transform='translateX(40px)'; el.style.transition='all 0.25s'; setTimeout(()=>el.remove(), 250); }
+  // FIX 6: Count remaining articles correctly after the current one is being removed
+  const remaining = document.getElementById('canon-content').querySelectorAll('article').length - 1;
+  const badge = document.getElementById('violation-count');
+  if (remaining <= 0) {
+    setStatus('clean'); badge.classList.add('hidden');
+    setTimeout(()=>{
+      document.getElementById('canon-content').innerHTML = `
+        <div class="text-center py-12">
+          <span class="icon text-[#8AA17E] mb-3 block" style="font-size:40px">verified</span>
+          <p class="font-display text-lg text-text-primary mb-1">Alright, fine. All sorted.</p>
+          <p class="text-text-muted text-sm">Every issue addressed. The canon lives.</p>
+        </div>`;
+    }, 300);
+  } else {
+    badge.textContent = remaining;
+  }
+}
+
+function goToLoreAndEdit(name) {
+  closeCanonDrawer();
+  const entry = state.lore.find(l => l.name.toLowerCase() === name.toLowerCase());
+  if (entry) {
+    state.selectedLoreId = entry.id;
+    goTo('lore');
+    setTimeout(()=>openLoreDetail(entry.id), 200);
+  } else { goTo('lore'); }
+}
+
+function openCanonDrawer() {
+  document.getElementById('canon-drawer').classList.add('open');
+  document.getElementById('canon-overlay').classList.add('open');
+}
+
+function closeCanonDrawer() {
+  document.getElementById('canon-drawer').classList.remove('open');
+  document.getElementById('canon-overlay').classList.remove('open');
+}
+
+// ─── LORE VAULT ─────────────────────────────────────────────
+const catLabels = { character: 'Character', rule: 'World Rule', location: 'Location', artifact: 'Artifact' };
+
+// FIX 3 (continued): Use data-loretab attribute to scope tab button selection to lore screen only
+function setLoreTab(tab) {
+  state.loreTab = tab;
+  document.querySelectorAll('[data-loretab]').forEach(btn => {
+    btn.className = btn.dataset.loretab === tab ? 'py-3 text-sm whitespace-nowrap tab-active' : 'py-3 text-sm whitespace-nowrap tab-inactive';
+  });
+  filterLore();
+}
+
+function filterLore() {
+  state.loreSearch = document.getElementById('lore-search')?.value?.toLowerCase() || '';
+  let filtered = state.lore;
+  if (state.loreTab !== 'all') filtered = filtered.filter(l => l.category === state.loreTab);
+  if (state.loreSearch) filtered = filtered.filter(l => l.name.toLowerCase().includes(state.loreSearch) || l.desc.toLowerCase().includes(state.loreSearch));
+  renderLoreList(filtered);
+}
+
+function renderLore() { filterLore(); }
+
+function renderLoreList(entries) {
+  const list = document.getElementById('lore-list');
+  const empty = document.getElementById('lore-empty');
+  list.innerHTML = '';
+  if (entries.length === 0) {
+    empty.classList.remove('hidden'); empty.classList.add('flex');
+    return;
+  }
+  empty.classList.add('hidden'); empty.classList.remove('flex');
+  const sorted = [...entries].sort((a,b) => a.name.localeCompare(b.name));
+  let currentLetter = '';
+  sorted.forEach(entry => {
+    const letter = entry.name[0].toUpperCase();
+    if (letter !== currentLetter) {
+      currentLetter = letter;
+      const letterEl = document.createElement('div');
+      letterEl.className = 'flex items-center gap-3 mt-4 mb-2';
+      letterEl.innerHTML = `<h3 class="text-primary font-display text-xl font-bold">${letter}</h3><div class="h-px bg-text-muted/20 flex-1"></div>`;
+      list.appendChild(letterEl);
+    }
+    const el = document.createElement('button');
+    el.className = 'w-full bg-surface rounded-sm border border-text-muted/30 hover:border-primary/50 p-4 text-left transition-colors slide-in';
+    el.innerHTML = `
+      <div class="flex items-start justify-between mb-1">
+        <h4 class="font-display font-bold text-text-primary text-lg leading-tight">${entry.name}</h4>
+        <span class="text-[10px] uppercase tracking-wider text-text-muted border border-text-muted/30 px-2 py-0.5 rounded-sm ml-2 shrink-0">${catLabels[entry.category]||entry.category}</span>
+      </div>
+      <p class="text-sm text-text-muted truncate">${entry.desc}</p>`;
+    el.onclick = () => openLoreDetail(entry.id);
+    list.appendChild(el);
+  });
+}
+
+function openAddLoreModal() {
+  document.getElementById('lore-name').value = '';
+  document.getElementById('lore-desc').value = '';
+  openModal('add-lore');
+}
+
+function saveLoreEntry() {
+  const name = document.getElementById('lore-name').value.trim();
+  const category = document.getElementById('lore-category').value;
+  const desc = document.getElementById('lore-desc').value.trim();
+  if (!name || !desc) return;
+  state.lore.push({ id: uid(), name, category, desc });
+  save();
+  closeAllModals();
+  filterLore();
+}
+
+function openLoreDetail(id) {
+  const entry = state.lore.find(l => l.id === id);
+  if (!entry) return;
+  state.selectedLoreId = id;
+  document.getElementById('lore-detail-tag').textContent = catLabels[entry.category] || entry.category;
+  document.getElementById('lore-detail-name').textContent = entry.name;
+  document.getElementById('lore-detail-desc').textContent = entry.desc;
+  openModal('lore-detail');
+}
+
+function deleteLoreEntry() {
+  if (!state.selectedLoreId) return;
+  if (!confirm('Delete this lore entry?')) return;
+  state.lore = state.lore.filter(l => l.id !== state.selectedLoreId);
+  state.selectedLoreId = null;
+  save();
+  closeAllModals();
+  filterLore();
+}
+
+// ─── THREAD TRACKER ─────────────────────────────────────────
+function renderThreads() {
+  const list = document.getElementById('thread-list');
+  const empty = document.getElementById('thread-empty');
+  list.innerHTML = '';
+  const active = state.threads.filter(t => !t.resolved);
+  const hasNeglected = active.some(t => {
+    const current = state.chapters.length > 0 ? Math.max(...state.chapters.map(c=>c.num)) : 0;
+    return (current - t.lastChapter) > 8;
+  });
+  ['threads-badge','threads-badge-lore'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { hasNeglected ? el.classList.remove('hidden') : el.classList.add('hidden'); }
+  });
+  if (active.length === 0) {
+    empty.classList.remove('hidden'); empty.classList.add('flex');
+    return;
+  }
+  empty.classList.add('hidden'); empty.classList.remove('flex');
+  const currentChapter = state.chapters.length > 0 ? Math.max(...state.chapters.map(c=>c.num)) : 0;
+  const sorted = [...active].sort((a,b) => a.lastChapter - b.lastChapter);
+  const container = document.createElement('div');
+  container.className = 'relative pl-8 space-y-6';
+  sorted.forEach(thread => {
+    const gap = currentChapter - thread.lastChapter;
+    const neglected = gap > 8;
+    const el = document.createElement('div');
+    el.className = 'relative flex items-start gap-4 thread-line';
+    el.innerHTML = `
+      <div class="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full z-10 ring-4 ring-bg-dark ${neglected?'bg-error animate-pulse':'bg-primary'}"></div>
+      <div class="flex-1 bg-surface rounded-sm border ${neglected?'border-error':'border-text-muted/30 hover:border-primary/50'} p-4 transition-colors cursor-pointer">
+        <div class="flex justify-between items-start mb-2">
+          <h3 class="font-display font-bold text-text-primary text-lg leading-tight">${thread.name}</h3>
+          <button class="text-text-muted hover:text-text-primary ml-2 shrink-0"><span class="icon" style="font-size:18px">edit</span></button>
+        </div>
+        <div class="space-y-0.5 text-sm text-text-muted">
+          <p>Origin: <span class="text-text-body">Chapter ${thread.originChapter}</span></p>
+          <p>Last mentioned: <span class="text-text-body">Chapter ${thread.lastChapter}</span></p>
+        </div>
+        ${neglected ? `
+          <div class="mt-3 bg-error/10 border border-error/30 rounded-sm px-3 py-2 flex items-center gap-2 text-error">
+            <span class="icon" style="font-size:16px">warning</span>
+            <span class="text-xs uppercase tracking-wider font-medium">${gap > 15 ? `Neglected for ${gap} chapters.` : 'Audience may have forgotten this.'}</span>
+          </div>` : ''}
+      </div>`;
+    el.querySelector('button').onclick = (e) => { e.stopPropagation(); openThreadDetail(thread.id); };
+    el.querySelector('.flex-1').onclick = () => openThreadDetail(thread.id);
+    container.appendChild(el);
+  });
+  // Resolved section
+  const resolved = state.threads.filter(t => t.resolved);
+  if (resolved.length > 0) {
+    const resHeader = document.createElement('div');
+    resHeader.className = 'mt-8 mb-3 flex items-center gap-3';
+    resHeader.innerHTML = `<p class="text-xs uppercase tracking-widest text-text-muted">Resolved (${resolved.length})</p><div class="h-px bg-text-muted/20 flex-1"></div>`;
+    container.appendChild(resHeader);
+    resolved.forEach(thread => {
+      const el = document.createElement('div');
+      el.className = 'bg-surface/50 rounded-sm border border-text-muted/15 p-3 flex items-center justify-between opacity-50';
+      el.innerHTML = `<span class="font-display text-text-muted line-through text-base">${thread.name}</span><span class="icon text-highlight" style="font-size:18px">check_circle</span>`;
+      container.appendChild(el);
+    });
+  }
+  list.appendChild(container);
+}
+
+function openAddThreadModal() {
+  const next = state.chapters.length > 0 ? Math.max(...state.chapters.map(c=>c.num)) : 1;
+  document.getElementById('thread-name').value = '';
+  document.getElementById('thread-origin').value = '';
+  document.getElementById('thread-last').value = next;
+  openModal('add-thread');
+}
+
+function saveThread() {
+  const name = document.getElementById('thread-name').value.trim();
+  const originChapter = parseInt(document.getElementById('thread-origin').value) || 1;
+  const lastChapter = parseInt(document.getElementById('thread-last').value) || originChapter;
+  if (!name) return;
+  state.threads.push({ id: uid(), name, originChapter, lastChapter, resolved: false });
+  save();
+  closeAllModals();
+  renderThreads();
+}
+
+function openThreadDetail(id) {
+  const thread = state.threads.find(t => t.id === id);
+  if (!thread) return;
+  state.selectedThreadId = id;
+  document.getElementById('thread-detail-name').textContent = thread.name;
+  document.getElementById('thread-update-last').value = thread.lastChapter;
+  openModal('thread-detail');
+}
+
+function updateThread() {
+  const thread = state.threads.find(t => t.id === state.selectedThreadId);
+  if (!thread) return;
+  thread.lastChapter = parseInt(document.getElementById('thread-update-last').value) || thread.lastChapter;
+  save();
+  closeAllModals();
+  renderThreads();
+}
+
+function resolveThread() {
+  const thread = state.threads.find(t => t.id === state.selectedThreadId);
+  if (!thread) return;
+  thread.resolved = true;
+  save();
+  closeAllModals();
+  renderThreads();
+}
+
+function deleteThread() {
+  // FIX 7: Guard against missing selectedThreadId before prompting
+  if (!state.selectedThreadId) return;
+  if (!confirm('Delete this thread?')) return;
+  state.threads = state.threads.filter(t => t.id !== state.selectedThreadId);
+  state.selectedThreadId = null;
+  save();
+  closeAllModals();
+  renderThreads();
+}
+
+// ─── SETTINGS ───────────────────────────────────────────────
+function showSettings() {
+  document.getElementById('settings-title').value = state.storyTitle;
+  document.getElementById('settings-wordgoal').value = state.wordGoal || '';
+  openModal('settings');
+}
+
+function saveSettings() {
+  state.storyTitle = document.getElementById('settings-title').value.trim() || state.storyTitle;
+  state.wordGoal = parseInt(document.getElementById('settings-wordgoal').value) || 0;
+  document.getElementById('codex-story-title').textContent = state.storyTitle;
+  save();
+  updateWordGoalBar();
+  closeAllModals();
+}
+
+function clearAllData() {
+  if (!confirm('Clear ALL data? This cannot be undone.')) return;
+  Object.assign(state, { storyTitle:'', chapters:[], lore:[], threads:[], wordGoal:0, sessionWords:0, sessionDate:'', currentChapterId:null });
+  localStorage.removeItem('archivist_state');
+  location.reload();
+}
+
+// ─── MODALS ─────────────────────────────────────────────────
+function openModal(name) {
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('modal-' + name).classList.add('open');
+}
+
+function closeAllModals() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
+}
+
+// ─── IMPORT & ANALYZE ────────────────────────────────────────
+let importResults = { lore: [], threads: [] };
+
+function resetImport() {
+  document.getElementById('import-text').value = '';
+  showImportStep('paste');
+  importResults = { lore: [], threads: [] };
+}
+
+// FIX 2 (continued): Centralize step transitions to correctly toggle display:flex
+function showImportStep(step) {
+  const steps = ['paste', 'loading', 'review'];
+  steps.forEach(s => {
+    const el = document.getElementById('import-step-' + s);
+    if (s === step) {
+      el.classList.remove('hidden');
+      el.style.display = 'flex';
+    } else {
+      el.classList.add('hidden');
+      el.style.display = '';
+    }
+  });
+}
+
+const loadingMessages = [
+  'Reading your story...',
+  'Mapping the characters...',
+  'Extracting world rules...',
+  'Hunting for loose threads...',
+  'Compiling the vault...',
+];
+
+async function runImportAnalysis() {
+  const text = document.getElementById('import-text').value.trim();
+  if (!text || text.length < 100) {
+    alert('Paste at least one full chapter to analyze.');
+    return;
+  }
+
+  showImportStep('loading');
+
+  let msgIdx = 0;
+  const msgEl = document.getElementById('import-loading-msg');
+  msgEl.textContent = loadingMessages[0];
+  const msgInterval = setInterval(() => {
+    msgIdx = (msgIdx + 1) % loadingMessages.length;
+    msgEl.textContent = loadingMessages[msgIdx];
+  }, 3000);
+
+  const prompt = `You are a story analyst. Read these chapters from a serialized web novel and extract structured data.
+
+CHAPTERS:
+${text.slice(0, 12000)}
+
+Extract and return a JSON object with exactly this structure:
+{
+  "lore": [
+    { "name": "Character or Rule Name", "category": "character|rule|location|artifact", "desc": "Description including any established facts, traits, rules, or constraints about this entry. Be specific." }
+  ],
+  "threads": [
+    { "name": "Plot thread name", "originChapter": 1, "lastChapter": 1, "desc": "Brief description of the unresolved thread" }
+  ]
+}
+
+Rules for extraction:
+- For characters: include personality traits, abilities, limitations, relationships, established facts
+- For world rules: include the exact mechanic and any edge cases mentioned
+- For locations: include relevant details
+- For threads: only include UNRESOLVED plot threads — mysteries, setups without payoff, promises not yet kept
+- originChapter and lastChapter should be chapter numbers (integers). If unclear, use 1.
+- Be thorough — extract ALL named characters, ALL rules mentioned, ALL unresolved setups
+- Return ONLY the JSON object. No explanation. No markdown backticks.`;
+
+  try {
+    const res = await fetch('/api/archivist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'import', prompt })
+    });
+    clearInterval(msgInterval);
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'Something went wrong. Try again.');
+    const parsed = data.result;
+    importResults.lore = (parsed.lore || []).map(l => ({ ...l, id: uid(), selected: true }));
+    importResults.threads = (parsed.threads || []).map(t => ({ ...t, id: uid(), selected: true, resolved: false }));
+    showImportReview();
+  } catch (err) {
+    clearInterval(msgInterval);
+    showImportStep('paste');
+    alert('Analysis failed: ' + (err.message || 'Something went wrong.'));
+  }
+}
+
+function showImportReview() {
+  showImportStep('review');
+
+  const loreCount = importResults.lore.length;
+  const threadCount = importResults.threads.length;
+  document.getElementById('import-lore-count').textContent = `${loreCount} lore entr${loreCount===1?'y':'ies'}`;
+  document.getElementById('import-thread-count').textContent = `${threadCount} thread${threadCount===1?'':'s'}`;
+
+  const list = document.getElementById('import-review-list');
+  list.innerHTML = '';
+
+  if (loreCount > 0) {
+    const header = document.createElement('p');
+    header.className = 'text-xs uppercase tracking-widest text-text-muted mb-2 mt-2';
+    header.textContent = 'Lore Entries';
+    list.appendChild(header);
+    importResults.lore.forEach((entry, i) => {
+      list.appendChild(makeReviewCard(entry, 'lore', i));
+    });
+  }
+
+  if (threadCount > 0) {
+    const header = document.createElement('p');
+    header.className = 'text-xs uppercase tracking-widest text-text-muted mb-2 mt-6';
+    header.textContent = 'Plot Threads';
+    list.appendChild(header);
+    importResults.threads.forEach((entry, i) => {
+      list.appendChild(makeReviewCard(entry, 'thread', i));
+    });
+  }
+
+  if (loreCount === 0 && threadCount === 0) {
+    list.innerHTML = `<div class="text-center py-12"><p class="text-text-muted">Nothing was extracted. Try pasting more chapter text.</p></div>`;
+  }
+}
+
+const catLabelsImport = { character: 'Character', rule: 'World Rule', location: 'Location', artifact: 'Artifact' };
+
+function makeReviewCard(entry, type, idx) {
+  const el = document.createElement('div');
+  el.className = 'bg-surface rounded-sm border border-text-muted/20 p-4 slide-in flex gap-3 items-start';
+  el.style.animationDelay = `${idx * 40}ms`;
+  const isLore = type === 'lore';
+  const tag = isLore ? (catLabelsImport[entry.category] || entry.category) : `Ch. ${entry.originChapter}→${entry.lastChapter}`;
+  el.innerHTML = `
+    <input type="checkbox" checked onchange="toggleImportEntry('${type}', '${entry.id}', this.checked)"
+      class="mt-1 w-4 h-4 accent-primary shrink-0 cursor-pointer"/>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <p class="font-display font-bold text-text-primary text-base leading-tight">${entry.name}</p>
+        <span class="text-[10px] uppercase tracking-wider text-text-muted border border-text-muted/30 px-2 py-0.5 rounded-sm shrink-0">${tag}</span>
+      </div>
+      <p class="text-sm text-text-muted leading-relaxed">${entry.desc || ''}</p>
+    </div>`;
+  return el;
+}
+
+function toggleImportEntry(type, id, selected) {
+  if (type === 'lore') {
+    const entry = importResults.lore.find(l => l.id === id);
+    if (entry) entry.selected = selected;
+  } else {
+    const entry = importResults.threads.find(t => t.id === id);
+    if (entry) entry.selected = selected;
+  }
+}
+
+function commitImport() {
+  const selectedLore = importResults.lore.filter(l => l.selected);
+  const selectedThreads = importResults.threads.filter(t => t.selected);
+
+  selectedLore.forEach(entry => {
+    if (!state.lore.find(l => l.name.toLowerCase() === entry.name.toLowerCase())) {
+      state.lore.push({ id: entry.id, name: entry.name, category: entry.category, desc: entry.desc });
+    }
+  });
+  selectedThreads.forEach(entry => {
+    if (!state.threads.find(t => t.name.toLowerCase() === entry.name.toLowerCase())) {
+      state.threads.push({ id: entry.id, name: entry.name, originChapter: entry.originChapter || 1, lastChapter: entry.lastChapter || 1, resolved: false });
+    }
+  });
+
+  save();
+  resetImport();
+  // FIX 9: Replace setTimeout+alert (which blocks UI) with a non-blocking toast-style notice
+  const loreAdded = selectedLore.length;
+  const threadsAdded = selectedThreads.length;
+  goTo('lore');
+  setTimeout(() => {
+    const msg = `Added ${loreAdded} lore entr${loreAdded===1?'y':'ies'} and ${threadsAdded} thread${threadsAdded===1?'':'s'} to your vault.`;
+    showToast(msg);
+  }, 300);
+}
+
+// FIX 9: Simple non-blocking toast notification to replace alert() after commitImport
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] bg-surface border border-primary/40 text-text-body text-sm px-5 py-3 rounded-sm shadow-xl slide-in whitespace-nowrap';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.4s';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+load();
+if (state.storyTitle) {
+  initApp();
+}
+</script>
+<template id="__bundler_thumbnail" data-bg-color="#181613">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#181613"/>
+    <text x="600" y="360" font-family="Georgia, 'Times New Roman', serif" font-size="120" font-weight="700" fill="#C2A46B" text-anchor="middle">The Archivist</text>
+    <rect x="480" y="440" width="240" height="3" fill="#8A8172"/>
+    <text x="600" y="520" font-family="Georgia, serif" font-size="34" fill="#8A8172" text-anchor="middle">continuity, quietly kept</text>
+  </svg>
+</template>
+</body>
+</html>
