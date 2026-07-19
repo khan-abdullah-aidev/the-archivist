@@ -2,9 +2,11 @@
 // Keeps the OpenRouter API key out of client code — set OPENROUTER_API_KEY
 // as an environment variable in the Vercel project settings.
 
+export const maxDuration = 60;
+
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free';
-const REQUEST_TIMEOUT_MS = 45000;
+const REQUEST_TIMEOUT_MS = 55000;
 
 const MAX_DRAFT_CHARS = 20000;
 const MAX_IMPORT_CHARS = 12000;
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ];
-    maxTokens = 4000;
+    maxTokens = 6000;
   } else if (action === 'import') {
     const { prompt } = body;
     if (typeof prompt !== 'string' || prompt.length < 100) {
@@ -107,7 +109,7 @@ export default async function handler(req, res) {
       return;
     }
     messages = [{ role: 'user', content: prompt }];
-    maxTokens = 6000;
+    maxTokens = 12000;
   } else {
     res.status(400).json({ error: 'Unknown or missing action.' });
     return;
@@ -150,6 +152,14 @@ export default async function handler(req, res) {
     try {
       parsed = extractJsonObject(raw);
     } catch (e) {
+      if (choice.finish_reason === 'length') {
+        res.status(502).json({
+          error: action === 'import'
+            ? 'The response was cut off before it finished (too much to extract in one pass). Try importing fewer chapters at a time.'
+            : 'The response was cut off before it finished. Try scanning a shorter draft or trimming your lore list.'
+        });
+        return;
+      }
       const snippet = raw.slice(0, 300).replace(/\s+/g, ' ').trim();
       res.status(502).json({ error: `The model returned malformed JSON. Raw output started with: "${snippet}"` });
       return;
