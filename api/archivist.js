@@ -10,11 +10,34 @@ const MAX_DRAFT_CHARS = 20000;
 const MAX_IMPORT_CHARS = 12000;
 const MAX_LORE_CONTEXT_CHARS = 20000;
 
-function stripToJson(raw) {
-  let text = raw.replace(/```json|```/g, '').trim();
-  // Reasoning models (Nemotron, DeepSeek R1, Qwen) sometimes leak thinking tags.
-  text = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-  return text;
+// Extracts the first balanced {...} object from the model's raw text, tolerating
+// leading/trailing commentary and reasoning-tag variants the model may leak
+// (Nemotron/DeepSeek/Qwen don't all use the same tag name, and "exclude" reasoning
+// isn't guaranteed to fully suppress it).
+function extractJsonObject(raw) {
+  let text = raw.replace(/```json|```/gi, '');
+  text = text.replace(/<(think|thinking|reasoning|scratchpad)>[\s\S]*?<\/\1>/gi, '').trim();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    // fall through to brace-matching below
+  }
+
+  const start = text.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in model output.');
+
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        return JSON.parse(text.slice(start, i + 1));
+      }
+    }
+  }
+  throw new Error('Unterminated JSON object in model output.');
 }
 
 async function callOpenRouter(apiKey, messages, maxTokens, signal) {
@@ -125,9 +148,10 @@ export default async function handler(req, res) {
 
     let parsed;
     try {
-      parsed = JSON.parse(stripToJson(raw));
+      parsed = extractJsonObject(raw);
     } catch (e) {
-      res.status(502).json({ error: 'The model returned malformed JSON. Try again.' });
+      const snippet = raw.slice(0, 300).replace(/\s+/g, ' ').trim();
+      res.status(502).json({ error: `The model returned malformed JSON. Raw output started with: "${snippet}"` });
       return;
     }
 
